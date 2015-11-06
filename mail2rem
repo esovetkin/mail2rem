@@ -66,13 +66,10 @@ extract_ics_files() {
     additional_query="$2"
     local dir # directory where *.ics files were extracted
     dir=$3
-
-    # it seems that there is no way one can specify in notmuch date
-    # like YYYY-MM-DD-HH-MM, therefore searching through all mails
-    # today. Some emails might be missed, depending on when the flag
-    # and notmuch db was updated...
-    # TODO: find a query in notmuch to specify timestamp
-    date=$(date +"%F" --date="${last_modified}")
+    local query
+    
+    # convert date to a format of notmuch
+    date=$(date +"%F,%H:%M:%S" --date="${last_modified}")
     if [[ "$?" -ne 0 ]]; then
         echo "Incorrect date: ${last_modified}" >&2
         exit 1
@@ -80,17 +77,17 @@ extract_ics_files() {
 
     # parse additional query
     [[ ! -z "${additional_query}" ]] && additional_query="(${additional_query})"
+
+    query="${additional_query} (attachment:ics AND date:${date}..)"
     
-    echo "Notmuch query: ${additional_query} (attachment:ics AND date:${date}..)"
-    notmuch search --sort=newest-first \
-            "${additional_query} (attachment:ics AND date:${date}..)"
+    echo "Notmuch query: ${query}"
+    notmuch search --sort=newest-first "${query}"
     
     while read line; do
-        # extract all attachments
+        # extract all attachments from selected mails
         ripmime -i "${line}" -d "${dir}"
     done < \
-         <(notmuch search --sort=newest-first --output=files \
-                   "${additional_query} (attachment:ics AND date:${date}..)")
+         <(notmuch search --sort=newest-first --output=files "${query}")
 
     # check that there are *.ics files
     ls "${dir}"/*.ics &> /dev/null
@@ -225,7 +222,6 @@ main() {
 #
 # END functions
 #
-
 
 PROGRAM="${0##*/}"
 
