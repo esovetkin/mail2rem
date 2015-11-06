@@ -215,8 +215,7 @@ main() {
     
     rm -rf "${extracted_dir}"
     
-    # change last modification date.  TODO: check that there is no mistake
-    # before
+    # change last modification date
     touch "${flag_file_path}"    
 }
 
@@ -254,8 +253,8 @@ temp_remind=${extracted_dir}/mail2rem_new.rem
 # calendar name
 remind_file=mail2rem.rem
 
-# process command arguments
-# TODO: these options processing is quite poor
+# process command arguments TODO: these options processing is quite
+# poor. As an alternative is getopt?
 while getopts "hd:f:c:q:s:t:l:" opt; do
     case ${opt} in
         h)
