@@ -3,11 +3,14 @@
 # mail2rem by Jenya Sovetkin <e dot sovetkin at gmail dot com>
 #             Cica Gustiani <cicagustiani at gmail dot com> 
 #
+# Dependencies: notmuch, ripmime, ical2rem (perl-ical-parser), gawk, sed
+#
 # THE FOLLOWING CODE IS RELEASED INTO THE PUBLIC DOMAIN
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE
+
 
 #
 # BEGIN functions
@@ -54,6 +57,7 @@ check_flag_date() {
 extract_ics_files() {
     local last_modified # date of last modification
     last_modified="$1"
+    # TODO parse properly additional query, add some query info
     local additional_query # additional questy passed to notmuch
     additional_query="$2"
     local dir # directory where *.ics files were extracted
@@ -63,8 +67,9 @@ extract_ics_files() {
     # like YYYY-MM-DD-HH-MM, therefore searching through all mails
     # today. Some emails might be missed, depending on when the flag
     # and notmuch db was updated...
+    # TODO: find a query in notmuch to specify timestamp
     date=$(date +"%F" --date="${last_modified}")
-    
+
     while read line; do
         # extract all attachments
         ripmime -i "${line}" -d "${dir}"
@@ -78,6 +83,7 @@ extract_ics_files() {
 }
 
 # find and convert reminders, trunk too long messages
+# TODO: needs a general parser for messages
 convert_and_clean_reminders() {
     local old_rem # reminder file
     old_rem="$1" 
@@ -96,7 +102,7 @@ convert_and_clean_reminders() {
     ical2rem "${dir}"/*.ics >> "${tmp_rem}"
     
     # remove redundant date and some extra symbols from reminders MSG
-    # TODO: someone might prefer to leave %a...
+    # TODO: someone might prefer to leave %a untouched
     sed -i 's/\%a//g; s/\%3//g; s/\%\"//g' "${tmp_rem}"
     
     # cut all messages with length more than $maximal_length...
@@ -221,6 +227,7 @@ flag_file=mail2rem.flag
 notmuch_config=~/.notmuch-config
 
 # additional string to the query
+# TODO make a more reasonable default
 notmuch_query="(folder:gmail/Inbox or folder:rwth/Inbox) and"
 
 # directory, where calendar files will be extracted
@@ -233,6 +240,7 @@ temp_remind=${extracted_dir}/mail2rem_new.rem
 remind_file=mail2rem.rem
 
 # process command arguments
+# TODO: these options processing is quite poor
 while getopts "hd:f:c:q:s:t:l:" opt; do
     case ${opt} in
         h)
