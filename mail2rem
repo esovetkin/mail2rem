@@ -173,6 +173,12 @@ _EOF
 
 # main function
 main() {    
+    # Check if the remind directory exists
+    if [[ ! -d ${remind_dir} ]]; then
+      echo "Error: remind directory ${remind_dir} is not found"
+      exit 1
+    fi
+
     local notmuch_flag # a path to flintlock file in notmuch
     local last_modified # the last time messages was searched
     
@@ -253,7 +259,8 @@ temp_remind=${extracted_dir}/mail2rem_new.rem
 remind_file=mail2rem.rem
 
 # if anything in config file is defined, overwrite the default values
-config_file="~/.mail2rem.conf"
+config_file=~/.mail2rem.conf
+source ${config_file}
 
 # if the option is declared, overwrite the defined parameters in
 # config file
