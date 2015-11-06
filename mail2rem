@@ -205,7 +205,6 @@ main() {
     # if no file were found, exit...
     if [[ "$?" -eq 1 ]]; then
         echo "No new calendar events in mail"
-        exit 0
     else
         echo "There are $(find "$extracted_dir" -iname "*.ics" | wc -l)"\
              "new calendar files. Converting to Remind..."
