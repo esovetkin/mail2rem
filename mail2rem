@@ -252,6 +252,11 @@ temp_remind=${extracted_dir}/mail2rem_new.rem
 # calendar name
 remind_file=mail2rem.rem
 
+# if anything in config file is defined, overwrite the default values
+config_file="~/.mail2rem.conf"
+
+# if the option is declared, overwrite the defined parameters in
+# config file
 # process command arguments TODO: these options processing is quite
 # poor. As an alternative is getopt?
 while getopts "hd:f:c:q:s:t:l:" opt; do
