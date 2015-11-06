@@ -60,7 +60,6 @@ check_flag_date() {
 extract_ics_files() {
     local last_modified # date of last modification
     last_modified="$1"
-    # TODO parse properly additional query, add some query info
     local additional_query # additional questy passed to notmuch
     additional_query="$2"
     local dir # directory where *.ics files were extracted
@@ -72,7 +71,18 @@ extract_ics_files() {
     # and notmuch db was updated...
     # TODO: find a query in notmuch to specify timestamp
     date=$(date +"%F" --date="${last_modified}")
+    if [[ "$?" -ne 0 ]]; then
+        echo "Incorrect date: ${last_modified}" >&2
+        exit 1
+    fi
 
+    # parse additional query
+    [[ ! -z "${additional_query}" ]] && additional_query="(${additional_query})"
+    
+    echo "Notmuch query: ${additional_query} (attachment:ics AND date:${date}..)"
+    notmuch search --sort=newest-first \
+            "${additional_query} (attachment:ics AND date:${date}..)"
+    
     while read line; do
         # extract all attachments
         ripmime -i "${line}" -d "${dir}"
@@ -82,7 +92,11 @@ extract_ics_files() {
 
     # check that there are *.ics files
     ls "${dir}"/*.ics &> /dev/null
-    [[ $? -eq 0 ]] && echo "true"
+    if [[ "$?" -eq 0 ]]; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 # find and convert reminders, trunk too long messages
@@ -161,7 +175,6 @@ _EOF
 main() {    
     local notmuch_flag # a path to flintlock file in notmuch
     local last_modified # the last time messages was searched
-    local flag_found_ics # indicates, if there were new *.ics were found
     
     # remove directory, where the mail files will be extracted
     rm -rf "${extracted_dir}" 
@@ -187,10 +200,10 @@ main() {
     last_modified=$(check_flag_date "${flag_file_path}" "${notmuch_flag}")
     
     # extract ics files
-    flag_found_ics=$(extract_ics_files "${last_modified}" "${notmuch_query}" "${extracted_dir}")
+    extract_ics_files "${last_modified}" "${notmuch_query}" "${extracted_dir}"
     
     # if no file were found, exit...
-    if [[ -z "$flag_found_ics" ]]; then
+    if [[ "$?" -eq 1 ]]; then
         echo "No new calendar events in mail"
         exit 0
     else
@@ -230,8 +243,7 @@ flag_file=mail2rem.flag
 notmuch_config=~/.notmuch-config
 
 # additional string to the query
-# TODO make a more reasonable default
-notmuch_query="(folder:gmail/Inbox or folder:rwth/Inbox) and"
+notmuch_query=""
 
 # directory, where calendar files will be extracted
 extracted_dir=/tmp/mail2rem-extracted
@@ -261,7 +273,6 @@ while getopts "hd:f:c:q:s:t:l:" opt; do
             ;;
         q)
             notmuch_query="${OPTARG}"
-            # TODO: process options to be applicable 
             ;;
         s)
             flag_file="${OPTARG}"
@@ -271,7 +282,12 @@ while getopts "hd:f:c:q:s:t:l:" opt; do
             ;;
         l)
             maximal_msg_length="${OPTARG}"
-            ## TODO: if set 0, then set it "". Must be a number
+            re='^[0-9]+$'
+            if ! [[ "${maximal_msg_length}" =~ ${re}  ]]; then
+                echo "Argument -l has to be an integer" >&2
+                exit 1
+            fi
+            [[ "${maximal_msg_length}" -eq 0 ]] && maximal_msg_length=""
             ;;
         :)
             echo "Option -${OPTARG} requires an argument." >&2
