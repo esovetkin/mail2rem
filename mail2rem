@@ -173,20 +173,20 @@ _EOF
 
 # main function
 main() {    
-    # Check if the remind directory exists
-    if [[ ! -d ${remind_dir} ]]; then
-      echo "Error: remind directory ${remind_dir} is not found"
-      exit 1
-    fi
-
     local notmuch_flag # a path to flintlock file in notmuch
     local last_modified # the last time messages was searched
+
+    # Check if the remind directory exists
+    if [[ ! -d ${remind_dir} ]]; then
+        echo "Error: remind directory ${remind_dir} is not found" >&2
+        exit 1
+    fi
     
     # remove directory, where the mail files will be extracted
     rm -rf "${extracted_dir}" 
     mkdir "${extracted_dir}"
     if [[ $? -ne 0 ]]; then
-        echo "Cannot create ${extracted_dir}. Exiting..."
+        echo "Cannot create ${extracted_dir}. Exiting..." >&2
         exit 1
     fi
     # protect the extracted dir from other users
