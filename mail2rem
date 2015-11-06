@@ -176,6 +176,14 @@ main() {
     local notmuch_flag # a path to flintlock file in notmuch
     local last_modified # the last time messages was searched
 
+    # Checking that length is specified correctly
+    re='^[0-9]+$'
+    if ! [[ "${maximal_msg_length}" =~ ${re}  ]]; then
+        echo "Argument -l (maximal_msg_length) has to be an integer" >&2
+        exit 1
+    fi
+    [[ "${maximal_msg_length}" -eq 0 ]] && maximal_msg_length=""
+    
     # Check if the remind directory exists
     if [[ ! -d ${remind_dir} ]]; then
         echo "Error: remind directory ${remind_dir} is not found" >&2
@@ -292,12 +300,6 @@ while getopts "hd:f:c:q:s:t:l:" opt; do
             ;;
         l)
             maximal_msg_length="${OPTARG}"
-            re='^[0-9]+$'
-            if ! [[ "${maximal_msg_length}" =~ ${re}  ]]; then
-                echo "Argument -l has to be an integer" >&2
-                exit 1
-            fi
-            [[ "${maximal_msg_length}" -eq 0 ]] && maximal_msg_length=""
             ;;
         :)
             echo "Option -${OPTARG} requires an argument." >&2
