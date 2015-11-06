@@ -1,0 +1,279 @@
+#!/usr/bin/env bash
+
+# mail2rem by Jenya Sovetkin <e dot sovetkin at gmail dot com>
+#             Cica Gustiani <cicagustiani at gmail dot com> 
+#
+# THE FOLLOWING CODE IS RELEASED INTO THE PUBLIC DOMAIN
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE
+
+#
+# BEGIN functions
+#
+
+# check last modification date
+check_flag_date() {
+    local mail2rem_file # mail2rem flag file
+    mail2rem_file="$1"
+    local notmuch_file # notmuch flag file
+    notmuch_file="$2"
+
+    local date1 # modification date of mail2rem
+    local date2 # modification date of notmuch
+    
+    # check the last modification date of the mail2rem
+    if [[ -a "${mail2rem_file}" ]]; then
+        # return last modification date of mail2rem
+        date1=$(date +"%F %H:%M" --date="$(stat -c %y ${mail2rem_file})")
+    else
+        # return UNIX starting date, if there is not flag_file found
+        date1=$(date +"%F %H:%M" --date="1970-01-01")
+    fi
+
+    # check the last modification date of the notmuch db
+    if [[ -a "${notmuch_file}" ]]; then
+        date2=$(date +"%F %H:%M" --date="$(stat -c %y ${notmuch_file})")
+    else
+        # return UNIX starting date, if there is not flag file found
+        date2=$(date +"%F %H:%M" --date="1970-01-01")
+    fi
+
+    # select the oldest modification date
+    if [[ $(date +%s -d "${date1}") -ge $(date +%s -d "${date2}") ]]; then
+        echo "${date2}"
+    else
+        echo "${date1}"
+    fi
+}
+
+# TODO: currently the function is quite bad, since it extracts
+# everything from the mail, not only the *.ics files. Good
+# replacement for ripmime?
+extract_ics_files() {
+    local last_modified # date of last modification
+    last_modified="$1"
+    local additional_query # additional questy passed to notmuch
+    additional_query="$2"
+    local dir # directory where *.ics files were extracted
+    dir=$3
+
+    # it seems that there is no way one can specify in notmuch date
+    # like YYYY-MM-DD-HH-MM, therefore searching through all mails
+    # today. Some emails might be missed, depending on when the flag
+    # and notmuch db was updated...
+    date=$(date +"%F" --date="${last_modified}")
+    
+    while read line; do
+        # extract all attachments
+        ripmime -i "${line}" -d "${dir}"
+    done < \
+         <(notmuch search --sort=newest-first --output=files \
+                   "${additional_query} (attachment:ics AND date:${date}..)")
+
+    # check that there are *.ics files
+    ls "${dir}"/*.ics &> /dev/null
+    [[ $? -eq 0 ]] && echo "true"
+}
+
+# find and convert reminders, trunk too long messages
+convert_and_clean_reminders() {
+    local old_rem # reminder file
+    old_rem="$1" 
+    local tmp_rem # temporal reminder file
+    tmp_rem="$2" 
+    local dir # directory where ics were extracted
+    dir="$3" 
+    local len # maximal allowed MSG length
+    len="$4" 
+    
+    # copy current mail2rem file to temp
+    [[ ! -f "${old_rem}" ]] && touch "${old_rem}"
+    cp "${old_rem}" "${tmp_rem}"
+
+    # convert found *.ics files to rem format
+    ical2rem "${dir}"/*.ics >> "${tmp_rem}"
+    
+    # remove redundant date and some extra symbols from reminders MSG
+    # TODO: someone might prefer to leave %a...
+    sed -i 's/\%a//g; s/\%3//g; s/\%\"//g' "${tmp_rem}"
+    
+    # cut all messages with length more than $maximal_length...
+    # \todo the length should be controlled by arguments
+    gawk -i inplace -F "MSG" -v len="${len}" '{print $1"MSG"substr($2,0,len)}' \
+         "${tmp_rem}"
+    
+    # remove duplicates and update the calendar file. 
+    sort -u "${tmp_rem}" > "${old_rem}"
+}
+
+# usage
+cmd_usage() {
+    cat <<-_EOF
+    Name:
+        $PROGRAM is a script for searching *.ics files in mail
+        and adding them to Remind calendar
+    
+         Dependencies: notmuch, ripmime, ical2rem (perl-ical-parser), gawk, sed
+
+    Usage:
+        $PROGRAM [options]
+
+    Options:
+        -d (=~/.cal) 
+                directory with Remind calendars
+
+        -f (=mail2rem.rem)
+                remind calendar filename
+
+        -c (=~/.notmuch-config) 
+                notmuch configuration file location
+
+        -q
+                additional query which is passed to notmuch
+ 
+        -s ($remind_dir/mail2rem.flag)
+                file which is used for tracing when the time
+                $PROGRAM was invoked the last time
+                 
+        -t (=/tmp/mail2rem-extracted)
+                a temporary directory which will be used for extracting
+                email attachments
+
+        -l (=75)
+                long messages in *.ics calendar will be trancated
+
+
+_EOF
+}
+
+# main function
+main() {    
+    local notmuch_flag # a path to flintlock file in notmuch
+    local last_modified # the last time messages was searched
+    local flag_found_ics # indicates, if there were new *.ics were found
+    
+    # remove directory, where the mail files will be extracted
+    rm -rf "${extracted_dir}" 
+    mkdir "${extracted_dir}"
+    if [[ $? -ne 0 ]]; then
+        echo "Cannot create ${extracted_dir}. Exiting..."
+        exit 1
+    fi
+    # protect the extracted dir from other users
+    chmod 700 "${extracted_dir}"
+    
+    # get the notmuch flag from configuration
+    notmuch_flag=$(echo "$(sed -n '/^path=/p' ~/.notmuch-config | sed 's/^path=//')"/.notmuch/xapian/flintlock)
+
+    [[ ! -a ${notmuch_flag} ]] && \
+        echo "Warning: flinglock wasn't found in notmuch directory. "\
+             "All messages instead of the latest will be processed." >&2
+    [[ ! -a ${flag_file_path} ]] && \
+        echo "Warning: mail2rem flag file wasn't found. "\
+             "A new one will be created." >&2
+    
+    # get the date when the script was run the last time
+    last_modified=$(check_flag_date "${flag_file_path}" "${notmuch_flag}")
+    
+    # extract ics files
+    flag_found_ics=$(extract_ics_files "${last_modified}" "${notmuch_query}" "${extracted_dir}")
+    
+    # if no file were found, exit...
+    if [[ -z "$flag_found_ics" ]]; then
+        echo "No new calendar events in mail"
+        exit 0
+    else
+        echo "There are $(find "$extracted_dir" -iname "*.ics" | wc -l)"\
+             "new calendar files. Converting to Remind..."
+        convert_and_clean_reminders "${mail_remind}" "${temp_remind}" \
+                                    "${extracted_dir}" "${maximal_msg_length}"
+    fi
+    
+    rm -rf "${extracted_dir}"
+    
+    # change last modification date.  TODO: check that there is no mistake
+    # before
+    touch "${flag_file_path}"    
+}
+
+#
+# END functions
+#
+
+
+PROGRAM="${0##*/}"
+
+# setting some constants
+
+# directory with remind calendar
+remind_dir=~/.cal
+
+# maximal length of message
+maximal_msg_length=75
+
+# flag file name that stores the last modification date
+flag_file=mail2rem.flag
+
+# location of notmuch configuration file. It is used to get the last
+# modification of notmuch database.
+notmuch_config=~/.notmuch-config
+
+# additional string to the query
+notmuch_query="(folder:gmail/Inbox or folder:rwth/Inbox) and"
+
+# directory, where calendar files will be extracted
+extracted_dir=/tmp/mail2rem-extracted
+
+# temporary remind file
+temp_remind=${extracted_dir}/mail2rem_new.rem
+
+# calendar name
+remind_file=mail2rem.rem
+
+# process command arguments
+while getopts "hd:f:c:q:s:t:l:" opt; do
+    case ${opt} in
+        h)
+            cmd_usage
+            exit 0
+            ;;
+        d)
+            remind_dir="${OPTARG}"
+            ;;
+        f)
+            remind_file="${OPTARG}"
+            ;;
+        c)
+            notmuch_config="${OPTARG}"
+            ;;
+        q)
+            notmuch_query="${OPTARG}"
+            # TODO: process options to be applicable 
+            ;;
+        s)
+            flag_file="${OPTARG}"
+            ;;
+        t)
+            extracted_dir="${OPTARG}"
+            ;;
+        l)
+            maximal_msg_length="${OPTARG}"
+            ## TODO: if set 0, then set it "". Must be a number
+            ;;
+        :)
+            echo "Option -${OPTARG} requires an argument." >&2
+            exit 1
+            ;;
+    esac
+done
+
+
+# flag file path that stores the last modification date
+flag_file_path=${remind_dir}/${flag_file}
+
+# reminder file by mail2rem
+mail_remind=${remind_dir}/${remind_file}
+
+main
