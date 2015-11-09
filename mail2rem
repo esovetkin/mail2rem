@@ -175,17 +175,7 @@ _EOF
 main() {    
     local notmuch_flag # a path to flintlock file in notmuch
     local last_modified # the last time messages was searched
-    
-    # remove directory, where the mail files will be extracted
-    rm -rf "${extracted_dir}" 
-    mkdir "${extracted_dir}"
-    if [[ $? -ne 0 ]]; then
-        echo "Cannot create ${extracted_dir}. Exiting..."
-        exit 1
-    fi
-    # protect the extracted dir from other users
-    chmod 700 "${extracted_dir}"
-    
+        
     # get the notmuch flag from configuration
     notmuch_flag=$(echo "$(sed -n '/^path=/p' ~/.notmuch-config | sed 's/^path=//')"/.notmuch/xapian/flintlock)
 
@@ -198,24 +188,41 @@ main() {
     
     # get the date when the script was run the last time
     last_modified=$(check_flag_date "${flag_file_path}" "${notmuch_flag}")
-    
-    # extract ics files
-    extract_ics_files "${last_modified}" "${notmuch_query}" "${extracted_dir}"
-    
-    # if no file were found, exit...
-    if [[ "$?" -eq 1 ]]; then
-        echo "No new calendar events in mail"
-    else
-        echo "There are $(find "$extracted_dir" -iname "*.ics" | wc -l)"\
-             "new calendar files. Converting to Remind..."
-        convert_and_clean_reminders "${mail_remind}" "${temp_remind}" \
-                                    "${extracted_dir}" "${maximal_msg_length}"
-    fi
-    
-    rm -rf "${extracted_dir}"
-    
-    # change last modification date
-    touch "${flag_file_path}"    
+
+    # part of script that requires locking
+    (    
+        flock -n 9
+        if [[ "$?" -ne 0 ]]; then
+            echo "Cannot get a lock file" >&2
+            exit 1
+        fi
+
+        # remove directory, where the mail files will be extracted
+        rm -rf "${extracted_dir}" 
+        mkdir "${extracted_dir}"
+        if [[ $? -ne 0 ]]; then
+            echo "Cannot create ${extracted_dir}. Exiting..."
+            exit 1
+        fi
+        # protect the extracted dir from other users
+        chmod 700 "${extracted_dir}"
+        
+        # extract ics files
+        extract_ics_files "${last_modified}" "${notmuch_query}" "${extracted_dir}"
+        
+        # if no file were found, exit...
+        if [[ "$?" -eq 1 ]]; then
+            echo "No new calendar events in mail"
+        else
+            echo "There are $(find "$extracted_dir" -iname "*.ics" | wc -l)"\
+                 "new calendar files. Converting to Remind..."
+            convert_and_clean_reminders "${mail_remind}" "${temp_remind}" \
+                                        "${extracted_dir}" "${maximal_msg_length}"
+        fi
+        
+        rm -rf "${extracted_dir}"
+    ) 9> "${flag_file_path}"
+        
 }
 
 #
