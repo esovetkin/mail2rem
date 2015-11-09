@@ -201,7 +201,7 @@ main() {
         rm -rf "${extracted_dir}" 
         mkdir "${extracted_dir}"
         if [[ $? -ne 0 ]]; then
-            echo "Cannot create ${extracted_dir}. Exiting..."
+            echo "Cannot create ${extracted_dir}. Exiting..." >&2
             exit 1
         fi
         # protect the extracted dir from other users
