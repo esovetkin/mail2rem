@@ -21,7 +21,10 @@ For Archlinux use::
 
   $ yaourt -S mail2rem-git
 
-or follow the guide on [AUR guide]: https://wiki.archlinux.org/index.php/Arch_User_Repository#Installing_packages to install the package from [AUR PKGBUILD]: https://aur.archlinux.org/packages/mail2rem-git/
+or follow the guide on [AUR guide]:
+https://wiki.archlinux.org/index.php/Arch_User_Repository#Installing_packages
+to install the package from [AUR PKGBUILD]:
+https://aur.archlinux.org/packages/mail2rem-git/
 
 For other systems simply copy the script to the directory included in
 your PATH, having installed the dependencies beforehand.
@@ -30,4 +33,17 @@ For installing dependencies follow instructions in the following
 links:
 * [ripmime]: http://www.pldaniels.com/ripmime/#downloads
 * [ical2rem]: http://jalcorn.net/public/ical2rem.pl
+
+Usage
+-----
+
+One has to specify the following arguments: '-d' directory with your
+Remind calendars, '-c' configuration file for notmuch (usually default
+is ~/.notmuch-config).
+
+One can also pass additional query for notmuch with '-q' arguments,
+e.g. to collect calendar files only from particular mail directory.
+
+For full list of options see:
+  $ notmuch -h
 
