@@ -177,7 +177,7 @@ main() {
     local last_modified # the last time messages was searched
         
     # get the notmuch flag from configuration
-    notmuch_flag=$(echo "$(sed -n '/^path=/p' ~/.notmuch-config | sed 's/^path=//')"/.notmuch/xapian/flintlock)
+    notmuch_flag=$(echo "$(sed -n '/^path=/p' ${notmuch_config} | sed 's/^path=//')"/.notmuch/xapian/flintlock)
 
     [[ ! -a ${notmuch_flag} ]] && \
         echo "Warning: flinglock wasn't found in notmuch directory. "\
