@@ -45,5 +45,5 @@ One can also pass additional query for notmuch with '-q' arguments,
 e.g. to collect calendar files only from particular mail directory.
 
 For full list of options see:
-  $ notmuch -h
+  $ mail2rem -h
 
